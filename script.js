@@ -1,13 +1,61 @@
 const agendamentos = [];
 
-const horariosDisponiveis = [
+const HORARIOS_DISPONIVEIS = [
     "09:00", "10:00", "11:00",
     "12:00", "13:00", "14:00",
     "15:00", "16:00", "17:00", "18:00"
 ];
 
-let hoje = new Date().toISOString().split("T")[0];
-document.getElementById("data").min = hoje;
+function obterDataHoje() {
+    return new Date().toISOString().split("T")[0];
+}
+
+function obterHoraAtual() {
+    return new Date().getHours();
+}
+
+function formatarData(data) {
+    return new Date(data).toLocaleDateString("pt-BR");
+}
+
+function obterHorariosOcupados(dataSelecionada) {
+    return agendamentos
+        .filter(ag => ag.data === dataSelecionada)
+        .map(ag => ag.horario);
+}
+
+function horarioJaPassou(dataSelecionada, horario) {
+    const hoje = obterDataHoje();
+
+    if (dataSelecionada !== hoje) return false;
+
+    const horaAtual = obterHoraAtual();
+    const horaDoHorario = Number(horario.split(":")[0]);
+
+    return horaDoHorario <= horaAtual;
+}
+
+function podeAgendar({ nome, data, horario }) {
+    const hoje = obterDataHoje();
+
+    if (!nome || !data || !horario) {
+        return { valido: false, mensagem: "Preencha todos os campos!" };
+    }
+
+    if (data < hoje) {
+        return { valido: false, mensagem: "Escolha uma data válida!" };
+    }
+
+    const jaExiste = agendamentos.some(ag =>
+        ag.data === data && ag.horario === horario
+    );
+
+    if (jaExiste) {
+        return { valido: false, mensagem: "Horário já ocupado!" };
+    }
+
+    return { valido: true };
+}
 
 function atualizarHorarios() {
     const dataSelecionada = document.getElementById("data").value;
@@ -17,31 +65,12 @@ function atualizarHorarios() {
 
     if (!dataSelecionada) return;
 
+    const horariosOcupados = obterHorariosOcupados(dataSelecionada);
 
-    let hoje = new Date().toISOString().split("T")[0];
-    let horaAtual = new Date().getHours();
+    HORARIOS_DISPONIVEIS.forEach(horario => {
+        if (horariosOcupados.includes(horario)) return;
+        if (horarioJaPassou(dataSelecionada, horario)) return;
 
-    const horariosOcupados = agendamentos
-        .filter(ag => ag.data === dataSelecionada)
-        .map(ag => ag.horario);
-
-    horariosDisponiveis.forEach(horario => {
-
-        
-        if (horariosOcupados.includes(horario)) {
-            return;
-        }
-
-        
-        if (dataSelecionada === hoje) {
-            let horaDoHorario = Number(horario.split(":")[0]);
-
-            if (horaDoHorario <= horaAtual) {
-                return;
-            }
-        }
-
-    
         const option = document.createElement("option");
         option.value = horario;
         option.textContent = horario;
@@ -52,50 +81,12 @@ function atualizarHorarios() {
     select.selectedIndex = 0;
 }
 
-function agendar() {
-    const nome = document.getElementById("nome").value;
-    const data = document.getElementById("data").value;
-    const horario = document.getElementById("horario").value;
-
-    let hoje = new Date().toISOString().split("T")[0];
-
-    
-    if (data < hoje) {
-        alert("Escolha uma data válida!");
-        return;
-    }
-
-    if (!nome || !data || !horario) {
-        alert("Preencha tudo!");
-        return;
-    }
-
-
-    const jaExiste = agendamentos.some(ag =>
-        ag.data === data && ag.horario === horario
-    );
-
-    if (jaExiste) {
-        alert("Horário já ocupado!");
-        return;
-    }
-
-    
-    agendamentos.push({ nome, data, horario });
-
-
+function renderizarAgendamento({ nome, data, horario }) {
     const lista = document.getElementById("listaDeAgendamento");
     const item = document.createElement("li");
 
-    let dataFormatada = new Date(data).toLocaleDateString("pt-BR");
-
-    item.textContent = `${nome} - ${dataFormatada} às ${horario}`;
+    item.textContent = `${nome} - ${formatarData(data)} às ${horario}`;
     lista.appendChild(item);
-
-    atualizarHorarios();
-    limparCampos();
-
-    alert(`Agendamento confirmado para ${dataFormatada} às ${horario}`);
 }
 
 function limparCampos() {
@@ -103,3 +94,32 @@ function limparCampos() {
     document.getElementById("horario").selectedIndex = 0;
 }
 
+function agendar() {
+    try {
+        const nome = document.getElementById("nome").value.trim();
+        const data = document.getElementById("data").value;
+        const horario = document.getElementById("horario").value;
+
+        const validacao = podeAgendar({ nome, data, horario });
+
+        if (!validacao.valido) {
+            alert(validacao.mensagem);
+            return;
+        }
+
+        const novoAgendamento = { nome, data, horario };
+
+        agendamentos.push(novoAgendamento);
+
+        renderizarAgendamento(novoAgendamento);
+        atualizarHorarios();
+        limparCampos();
+
+        alert(`Agendamento confirmado para ${formatarData(data)} às ${horario}`);
+    } catch (erro) {
+        console.error("Erro ao agendar:", erro);
+        alert("Erro interno ao realizar agendamento.");
+    }
+}
+
+document.getElementById("data").min = obterDataHoje();
